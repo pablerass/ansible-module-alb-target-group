@@ -1,0 +1,39 @@
+- hosts: localhost
+  tasks:
+    - name: "Target Group Not Exists"
+      ec2_target_group:
+        name: "test"
+        state: "absent"
+
+    - name: "Target Group Created"
+      ec2_target_group:
+        name: "test"
+        vpc_id: "vpc-bf3e8bd8"
+        protocol: "HTTP"
+        port: 8080
+        health_check_port: "traffic-port"
+        health_check_path: "/up"
+
+    - name: "Target Group Not Modified"
+      ec2_target_group:
+        name: "test"
+        vpc_id: "vpc-bf3e8bd8"
+        protocol: "HTTP"
+        port: 8080
+        health_check_port: "traffic-port"
+        health_check_path: "/up"
+
+    - name: "Target Group Modified"
+      ec2_target_group:
+        name: "test"
+        vpc_id: "vpc-bf3e8bd8"
+        protocol: "HTTP"
+        port: 8080
+        health_check_port: 8888
+        health_check_path: "/down"
+        health_check_http_code: "200,400"
+
+    - name: "Target Group Deleted"
+      ec2_target_group:
+        name: "test"
+        state: "absent"
