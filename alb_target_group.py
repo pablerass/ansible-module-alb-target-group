@@ -1,19 +1,14 @@
 #!/usr/bin/python
+# TODO: Add tagging support
 
 DOCUMENTATION = '''
 ---
-module: ec2_target_group
-short_description: create or delete a target group in ec2
+module: alb_target_group
+short_description: create or delete a target group
 description:
-  - Creates or deletes ec2 target groups.
-notes:
-  - the service role specified must be assumable (i.e. have a trust relationship for the ecs service, ecs.amazonaws.com)
-  - for details of the parameters and returns see U(http://boto3.readthedocs.org/en/latest/reference/services/ecs.html)
-dependencies:
-  - An IAM role must have been created
-version_added: "2.1"
+  - Creates or deletes target groups.
 author:
-    - "Darek Kaczynski (@kaczynskid)"
+    - "Pablo Munoz"
 requirements: [ json, botocore, boto3 ]
 options:
     state:
@@ -25,21 +20,53 @@ options:
     name:
         description:
           - The name of the target group
-        required:
+        required: true
     vpc_id:
         description:
           - The VPC ID for the VPC in which to create the target group
-        required: true
-        default: null
+        required: false
     port:
         description:
           - The port of the target group
         required: false
     protocol:
         description:
-          - The count of how many instances of the service
+          - The protocol of the target group
         required: false
         choices: ["HTTP", "HTTPS"]
+    health_check_protocol:
+        description:
+          - The protocl of the target group health check
+        required: false
+        choices: ["HTTP", "HTTPS"]
+    health_check_port:
+        description:
+          - The port of the target group health check
+        required: false
+    health_check_interval_seconds:
+        description:
+          - The interval in seconds of target group health checks
+        required: false
+    health_check_timeout_seconds:
+        description:
+          - The timeout in seconds of target group health check
+        required: false
+    healthy_threshold_count:
+        description:
+          - The healthy threshold of target group health check
+        required: false
+    unhealthy_threshold_count:
+        description:
+          - The unhealthy threshold of target group health check
+        required: false
+    health_check_path:
+        description:
+          - The path of target group health check
+        required: false
+    health_check_http_code:
+        description:
+          - The http code of target group health check
+        required: false
 extends_documentation_fragment:
     - aws
     - ec2
@@ -47,14 +74,14 @@ extends_documentation_fragment:
 
 EXAMPLES = '''
 # Note: These examples do not set authentication details, see the AWS Guide for details.
-- ec2_target_group:
+- alb_target_group:
     state: "present"
     name: "test-service"
     vpc_id: "vpc-abcdefgh"
     port: 80
     protocol: "HTTP"
 # Simple example to delete
-- ec2_target_group:
+- alb_target_group:
     name: "test-service"
     vpc_id: "vpc-abcdefgh"
     state: "absent"
@@ -62,76 +89,67 @@ EXAMPLES = '''
 
 RETURN = '''
 target_group:
-    description: Details of created target group.
-    returned: when creating a service
+    description: Details of created or deleted target group.
+    returned: when creating, deleting or modifying a target group
     type: complex
     contains:
-        clusterArn:
-            description: The Amazon Resource Name (ARN) of the of the cluster that hosts the service.
+        TargetGroupArn:
+            description: The Amazon Resource Name (ARN) of the target group.
             returned: always
             type: string
-        desiredCount:
-            description: The desired number of instantiations of the task definition to keep running on the service.
+        TargetGroupName:
+            description: The name of the target group.
+            returned: always
+            type: string
+        Protocol:
+            description:
+            returned: always
+            type: string
+        Port:
+            description:
             returned: always
             type: int
-        loadBalancers:
-            description: A list of load balancer objects
+        VpcID:
+            description:
+            returned: always
+            type: string
+        HealthCheckIntervalSeconds:
+            description:
+            returned: always
+            type: int
+        HealthCheckPath:
+            description:
+            returned: always
+            type: string
+        HealthCheckPort:
+            description:
+            returned: always
+            type: string
+        HealthCheckProtocol:
+            description:
+            returned: always
+            type: string
+        HealthCheckTimeoutSeconds:
+            description:
+            returned: always
+            type: int
+        HealthyThresholdCount:
+            description:
+            returned: always
+            type: int
+        UnhealthyThersholdCount:
+            description:
+            returned: always
+            type: int
+        Matcher:
+            description:
             returned: always
             type: complex
             contains:
-                loadBalancerName:
-                    description: the name
+                HttpCode:
+                    description:
                     returned: always
                     type: string
-                containerName:
-                    description: The name of the container to associate with the load balancer.
-                    returned: always
-                    type: string
-                containerPort:
-                    description: The port on the container to associate with the load balancer.
-                    returned: always
-                    type: int
-        pendingCount:
-            description: The number of tasks in the cluster that are in the PENDING state.
-            returned: always
-            type: int
-        runningCount:
-            description: The number of tasks in the cluster that are in the RUNNING state.
-            returned: always
-            type: int
-        serviceArn:
-            description: The Amazon Resource Name (ARN) that identifies the service. The ARN contains the arn:aws:ecs namespace, followed by the region of the service, the AWS account ID of the service owner, the service namespace, and then the service name. For example, arn:aws:ecs:region :012345678910 :service/my-service .
-            returned: always
-            type: string
-        serviceName:
-            description: A user-generated string used to identify the service
-            returned: always
-            type: string
-        status:
-            description: The valid values are ACTIVE, DRAINING, or INACTIVE.
-            returned: always
-            type: string
-        taskDefinition:
-            description: The ARN of a task definition to use for tasks in the service.
-            returned: always
-            type: string
-        deployments:
-            description: list of service deployments
-            returned: always
-            type: list of complex
-        events:
-            description: lost of service events
-            returned: always
-            type: list of complex
-ansible_facts:
-    description: Facts about deleted service.
-    returned: when deleting a service
-    type: complex
-    contains:
-        service:
-            description: Details of deleted service in the same structure described above for service creation.
-            returned: when service existed and was deleted
-            type: complex
 '''
 try:
     import boto3
@@ -323,7 +341,7 @@ def main():
                     })
                     response = target_group_mgr.create_target_group(**args)
 
-                results['TargetGroup'] = response
+                results['target_group'] = response
 
             results['changed'] = True
 
@@ -333,7 +351,7 @@ def main():
         else:
             # it exists, so we should delete it and mark changed.
             # return info about the cluster deleted
-            results['ansible_facts'] = existing
+            results['target_group'] = existing["TargetGroupNa,e
             if not module.check_mode:
                 try:
                     target_group_mgr.delete_target_group(
